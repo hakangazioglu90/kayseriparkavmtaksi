@@ -1,7 +1,9 @@
 // src/pages/Home.tsx
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { searchTR, GeoPick } from "../api/geocode";
+import { searchTR } from "../api/geocode";
+import type { GeoPick } from "../api/geocode";
+
 
 function PickBox(props: { label: string; value: GeoPick | null; onPick: (p: GeoPick) => void }) {
   const [q, setQ] = useState("");

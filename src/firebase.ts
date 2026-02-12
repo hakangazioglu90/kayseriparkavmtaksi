@@ -13,7 +13,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FB_APP_ID,
   databaseURL: import.meta.env.VITE_FB_RTDB_URL,
 };
-
+console.log("API KEY:", import.meta.env.VITE_FB_API_KEY);
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);

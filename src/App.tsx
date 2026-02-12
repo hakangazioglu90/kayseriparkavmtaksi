@@ -2,11 +2,11 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { ensureAnonAuth } from "./firebase";
-import Home from "./pages/Home";
-import Results from "./pages/Results";
-import Confirm from "./pages/Confirm";
-import Driver from "./pages/Driver";
-import ActiveVehicles from "./pages/ActiveVehicles";
+import Home from "./Pages/Home";
+import Results from "./Pages/Results";
+import Confirm from "./Pages/Confirm";
+import Driver from "./Pages/Driver";
+import ActiveVehicles from "./Pages/ActiveVehicles";
 
 export default function App() {
   useEffect(() => { ensureAnonAuth(); }, []);
