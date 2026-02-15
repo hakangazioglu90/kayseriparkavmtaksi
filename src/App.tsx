@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
-import Results from "./pages/Results";
-import Confirm from "./pages/Confirm";
-import ActiveVehicles from "./pages/ActiveVehicles";
+import Home from "./Pages/Home";
+import Results from "./Pages/Results";
+import Confirm from "./Pages/Confirm";
+import ActiveVehicles from "./Pages/ActiveVehicles";
 
 export default function App() {
   const allowAccess = useMemo(() => {
