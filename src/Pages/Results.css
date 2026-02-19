@@ -1,0 +1,93 @@
+/* src/Pages/Results.css
+   Page-scoped styles for Results.tsx vehicle listing cards (responsive + image grid)
+*/
+
+/* KPI row */
+.kpi{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.kpiItem{
+  padding:10px 12px;
+  border:1px solid var(--border, #e6e6e6);
+  border-radius:12px;
+  background: var(--card, #fff);
+  font-weight:850;
+}
+
+/* Vehicle card layout: media | details | actions */
+.vehicleCard{
+  display:grid;
+  grid-template-columns: 240px 1fr auto;
+  gap:14px;
+  align-items:stretch;
+  padding:12px;                 /* because this card does NOT use .cardPad */
+}
+
+/* subtle hover/focus polish */
+.vehicleCard:hover{
+  box-shadow: 0 10px 26px rgba(0,0,0,.08);
+  transform: translateY(-1px);
+}
+.vehicleCard:focus-within{
+  outline: 2px solid rgba(0,0,0,.15);
+  outline-offset: 2px;
+}
+
+/* Media block */
+.vehicleCard .media{
+  display:grid;
+  gap:10px;
+}
+.vehicleCard .mediaMain{
+  width:100%;
+  aspect-ratio: 1 / 1;
+  border-radius:14px;
+  border:1px solid var(--border, #e6e6e6);
+  background: var(--card, #fff);
+  object-fit:cover;
+  display:block;
+  overflow:hidden;
+}
+
+/* Thumbnails row under main image */
+.vehicleCard .thumbs{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:8px;
+  align-items:stretch;
+}
+.vehicleCard .thumb{
+  width:100%;
+  aspect-ratio: 1 / 1;
+  border-radius:10px;
+  border:1px solid var(--border, #e6e6e6);
+  background: var(--card, #fff);
+  object-fit:cover;
+  display:block;
+}
+
+/* Right column (price + CTA) */
+.vehicleCard > div:nth-child(3){
+  justify-items:end;
+  align-content:start;
+}
+
+/* Make it desktop+mobile responsive */
+@media (max-width: 900px){
+  .vehicleCard{
+    grid-template-columns: 1fr;
+  }
+
+  .vehicleCard .thumbs{
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .vehicleCard > div:nth-child(3){
+    justify-items:stretch;
+  }
+  .vehicleCard > div:nth-child(3) button{
+    width:100%;
+  }
+}
