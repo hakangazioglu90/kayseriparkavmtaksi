@@ -197,7 +197,7 @@ export default function Confirm() {
                       className="input"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder={trEn("Örn: Ada Deniz", "Example: Ada Deniz")}
+                      placeholder={trEn("", "")}
                     />
                   </div>
                 </div>
