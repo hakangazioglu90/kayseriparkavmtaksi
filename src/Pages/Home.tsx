@@ -1,15 +1,22 @@
 // src/Pages/Home.tsx  (FULL)
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { Map as LeafletMap } from "leaflet";
+import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useNavigate } from "react-router-dom";
 import { reversePlace, searchPlace } from "../api/geocode";
 import type { GeoPick } from "../api/geocode";
 import { useI18n } from "../i18n";
 
 // Uses react-leaflet (already in project via RouteMap)
-import { MapContainer, TileLayer, useMapEvents } from "react-leaflet";
 
 type LatLng = { lat: number; lng: number };
-
+function MapRefBinder({ onMap }: { onMap: (m: LeafletMap) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    onMap(map);
+  }, [map, onMap]);
+  return null;
+}
 function Stepper() {
   const { t } = useI18n();
   return (
@@ -187,8 +194,10 @@ function PickFromMapModal(props: {
 }) {
   const { lang } = useI18n();
   const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
-
-  const mapRef = useRef<any>(null);
+const mapRef = useRef<LeafletMap | null>(null);
+const bindMap = useCallback((m: LeafletMap) => {
+  mapRef.current = m;
+}, []);
 
   const [center, setCenter] = useState<LatLng>(() => {
     return props.initial ?? loadLastCenter() ?? { lat: 39.0, lng: 35.0 }; // generic TR-ish starting point; user can search anywhere
@@ -399,18 +408,14 @@ function PickFromMapModal(props: {
           </div>
 
           <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
-            <MapContainer
-              center={[center.lat, center.lng]}
-              zoom={14}
-              style={{ width: "100%", height: "min(54vh, 520px)" }}
-              whenCreated={(m) => (mapRef.current = m)}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <CenterTracker onCenter={updateCenter} />
-            </MapContainer>
+           <MapContainer center={[center.lat, center.lng]} zoom={14} style={{ width: "100%", height: "min(54vh, 520px)" }}>
+  <TileLayer
+    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  />
+  <MapRefBinder onMap={bindMap} />
+  <CenterTracker onCenter={updateCenter} />
+</MapContainer>;
 
             {/* Fixed pin at map center */}
             <div
