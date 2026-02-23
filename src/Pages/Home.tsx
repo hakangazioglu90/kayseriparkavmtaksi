@@ -241,45 +241,47 @@ export default function Home() {
               />
             </div>
 
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div style={{ width: "min(260px, 100%)" }}>
-                <div className="small" style={{ fontWeight: 900, color: "rgba(0,0,0,.7)" }}>
-                  {t("common.date")}
-                </div>
-                <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
+            <div className="row" style={{ justifyContent: "flex-end", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+  {/* Date picker: to the left of the buttons, aligned to the right */}
+  <div style={{ width: "min(260px, 100%)" }}>
+    <div className="small" style={{ fontWeight: 900, color: "rgba(0,0,0,.7)" }}>
+      {t("common.date")}
+    </div>
+    <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+  </div>
 
-              <div className="row" style={{ justifyContent: "flex-end", flex: 1 }}>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    const f = from;
-                    const tt = to;
-                    setFrom(tt);
-                    setTo(f);
-                  }}
-                  disabled={!from && !to}
-                  title={t("common.swap")}
-                >
-                  {t("common.swap")}
-                </button>
+  {/* Buttons: stay rightmost */}
+  <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+    <button
+      className="btn"
+      onClick={() => {
+        const f = from;
+        const tt = to;
+        setFrom(tt);
+        setTo(f);
+      }}
+      disabled={!from && !to}
+      title={t("common.swap")}
+    >
+      {t("common.swap")}
+    </button>
 
-                <button
-                  className="btn btnPrimary"
-                  disabled={!canSearch}
-                  onClick={() => {
-                    setErr("");
-                    if (!from || !to || !date) {
-                      setErr(t("common.missing"));
-                      return;
-                    }
-                    nav("/results", { state: { from, to, date } });
-                  }}
-                >
-                  {t("common.search")}
-                </button>
-              </div>
-            </div>
+    <button
+      className="btn btnPrimary"
+      disabled={!canSearch}
+      onClick={() => {
+        setErr("");
+        if (!from || !to || !date) {
+          setErr(t("common.missing"));
+          return;
+        }
+        nav("/results", { state: { from, to, date } });
+      }}
+    >
+      {t("common.search")}
+    </button>
+  </div>
+</div>
 
             {err && <div style={{ color: "var(--bad)", fontWeight: 800 }}>{err}</div>}
           </div>
