@@ -241,29 +241,20 @@ export default function Home() {
               />
             </div>
 
-            {/* REPLACE ONLY THIS WHOLE ROW BLOCK */}
+           {/* REPLACE ONLY THIS BLOCK */}
 <div
-  className="row"
   style={{
-    justifyContent: "space-between",
-    alignItems: "flex-end",
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    alignItems: "end",
     gap: 12,
-    flexWrap: "wrap",
   }}
 >
-  {/* spacer keeps layout stable while pushing controls to the right */}
-  <div style={{ flex: 1 }} />
+  {/* left side kept intentionally empty (stable layout without weird flex gaps) */}
+  <div />
 
-  {/* right-side group: date then buttons */}
-  <div
-    className="row"
-    style={{
-      justifyContent: "flex-end",
-      alignItems: "flex-end",
-      gap: 10,
-      flexWrap: "wrap",
-    }}
-  >
+  {/* right side group: date (left) + buttons (right) */}
+  <div className="row" style={{ justifyContent: "flex-end", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
     <div style={{ width: "min(260px, 100%)" }}>
       <div className="small" style={{ fontWeight: 900, color: "rgba(0,0,0,.7)" }}>
         {t("common.date")}
