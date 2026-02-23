@@ -233,7 +233,7 @@ export function PickToMapModal(props: {
       const code = Number(e?.code || 0);
       if (code === 1) setErr(trEn("Konum izni reddedildi.", "Location permission denied."));
       else if (code === 2) setErr(trEn("Konum alınamadı.", "Position unavailable."));
-      else if (code === 3) setErr(trEn("Zaman aşımı (3 sn).", "Timed out (3s)."));
+      else if (code === 3) setErr(trEn("Zaman aşımı (3 sn) Tekrar Deneyiniz.", "Timed out (3s) Try Again."));
       else setErr(trEn("Konum alınamadı.", "Could not get location."));
     } finally {
       setBusy(false);
