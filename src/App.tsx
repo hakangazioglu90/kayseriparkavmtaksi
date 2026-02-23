@@ -24,16 +24,49 @@ function LangButtons() {
   );
 }
 
+function IconPhone({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M6.5 3.5l3 2.3c.6.5.8 1.3.4 2l-1.1 2c-.2.4-.2.9.1 1.3c1.2 1.7 2.6 3.1 4.3 4.3c.4.3.9.3 1.3.1l2-1.1c.7-.4 1.5-.2 2 .4l2.3 3c.6.7.5 1.8-.2 2.4c-1.1 1-2.6 1.5-4.2 1.3c-6.3-.8-11.3-5.8-12.1-12.1c-.2-1.6.3-3.1 1.3-4.2c.6-.7 1.7-.8 2.4-.2Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconWhatsApp({ size = 22 }: { size?: number }) {
+  // Generic chat+phone mark (WhatsApp-like without text)
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M20 11.5A7.5 7.5 0 0 1 8.9 18.2L5 19l.9-3.8A7.5 7.5 0 1 1 20 11.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 9.8c.2-.5.7-.8 1.2-.6l.8.3c.4.2.6.6.5 1l-.2.6c.6.9 1.3 1.6 2.2 2.2l.6-.2c.4-.1.8.1 1 .5l.3.8c.2.5-.1 1-.6 1.2c-1 .4-2.7.1-4.5-1.6c-1.7-1.8-2-3.5-1.6-4.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function PhoneModal(props: {
   open: boolean;
   onClose: () => void;
   phoneDisplay: string;
   phoneE164: string; // "+90530..."
 }) {
-  const { lang } = useI18n();
-  const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
-
-  const firstBtnRef = useRef<HTMLAnchorElement | null>(null);
+  const firstActionRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
     if (!props.open) return;
@@ -43,7 +76,7 @@ function PhoneModal(props: {
     };
     window.addEventListener("keydown", onKey);
 
-    setTimeout(() => firstBtnRef.current?.focus(), 0);
+    setTimeout(() => firstActionRef.current?.focus(), 0);
 
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -64,7 +97,7 @@ function PhoneModal(props: {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={trEn("İletişim seçenekleri", "Contact options")}
+      aria-label={props.phoneDisplay}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) props.onClose();
       }}
@@ -79,44 +112,52 @@ function PhoneModal(props: {
         padding: 12,
       }}
     >
-      <div className="card" style={{ width: "min(440px, 100%)", overflow: "hidden" }}>
-        <div className="cardPad grid" style={{ gap: 12 }}>
+      <div className="card" style={{ width: "min(420px, 100%)", overflow: "hidden" }}>
+        <div className="cardPad grid" style={{ gap: 14 }}>
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontWeight: 950, fontSize: 18 }}>{props.phoneDisplay}</div>
-            <button className="btn" onClick={props.onClose} aria-label={trEn("Kapat", "Close")}>
+            <button className="btn" onClick={props.onClose} aria-label="Close">
               ✕
             </button>
           </div>
 
-          <div className="small" style={{ opacity: 0.85 }}>
-            {trEn("Bir seçenek seçin:", "Choose an option:")}
-          </div>
-
-          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: 12, justifyContent: "center" }}>
             <a
-              ref={firstBtnRef}
-              className="btn btnPrimary"
+              ref={firstActionRef}
               href={telUrl}
-              style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+              className="btn btnPrimary"
+              aria-label="Call"
+              title="Call"
+              style={{
+                width: 54,
+                height: 54,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 999,
+              }}
             >
-              <span aria-hidden="true">📞</span>
-              {trEn("Ara", "Call")}
+              <IconPhone />
             </a>
 
             <a
-              className="btn"
               href={waUrl}
               target="_blank"
               rel="noreferrer"
-              style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+              className="btn"
+              aria-label="WhatsApp"
+              title="WhatsApp"
+              style={{
+                width: 54,
+                height: 54,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 999,
+              }}
             >
-              <span aria-hidden="true">💬</span>
-              WhatsApp
+              <IconWhatsApp />
             </a>
-          </div>
-
-          <div className="small" style={{ opacity: 0.75 }}>
-            {trEn("Dışarı tıklama, X veya ESC ile kapanır.", "Close by clicking outside, X, or ESC.")}
           </div>
         </div>
       </div>
@@ -144,36 +185,36 @@ export default function App() {
     <BrowserRouter>
       <style>{injectedCss}</style>
 
-      <PhoneModal
-        open={phoneOpen}
-        onClose={() => setPhoneOpen(false)}
-        phoneDisplay={phoneDisplay}
-        phoneE164={phoneE164}
-      />
+      <PhoneModal open={phoneOpen} onClose={() => setPhoneOpen(false)} phoneDisplay={phoneDisplay} phoneE164={phoneE164} />
 
       <div className="topbar">
         <div className="brandRow">
-          <Link className="brand" to="/" aria-label={t("nav.search")} style={{ textDecoration: "none", color: "inherit" }}>
-            <span style={{ width: 14, height: 14, borderRadius: 4, background: "var(--brand)" }} />
-            <span>{t("brand.name")}</span>
-          </Link>
+          {/* Brand + phone as text next to brand (not a button) */}
+          <div className="brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Link to="/" aria-label={t("nav.search")} style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 14, height: 14, borderRadius: 4, background: "var(--brand)" }} />
+              <span>{t("brand.name")}</span>
+            </Link>
 
-          <button
-            className="btn"
-            onClick={() => setPhoneOpen(true)}
-            aria-label={phoneDisplay} // fixed: no i18n key needed
-            title={phoneDisplay}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 10,
-              fontWeight: 850,
-              whiteSpace: "nowrap",
-            }}
-          >
-            <span aria-hidden="true">📞</span>
-            {phoneDisplay}
-          </button>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setPhoneOpen(true);
+              }}
+              title={phoneDisplay}
+              aria-label={phoneDisplay}
+              style={{
+                fontWeight: 850,
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+                color: "inherit",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {phoneDisplay}
+            </a>
+          </div>
 
           <div className="row" style={{ gap: 8 }}>
             <Link className="btn" to="/">
