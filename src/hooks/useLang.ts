@@ -9,7 +9,16 @@ export function useLang() {
 
   useEffect(() => {
     const saved = (localStorage.getItem(KEY) as Lang | null) || null;
-    if (saved === "tr" || saved === "en") setLang(saved);
+    if (saved === "tr" || saved === "en") {
+      setLang(saved);
+      return;
+    }
+
+    // First-visit auto-detect (TR/EN only), then persist
+    const raw = (navigator.languages?.[0] || navigator.language || "").toLowerCase();
+    const detected: Lang = raw.startsWith("tr") ? "tr" : "en";
+    setLang(detected);
+    localStorage.setItem(KEY, detected);
   }, []);
 
   const api = useMemo(() => {

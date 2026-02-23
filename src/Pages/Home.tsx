@@ -1,7 +1,7 @@
 // src/Pages/Home.tsx  (FULL)
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { searchPlace } from "../api/geocode";
+import { reversePlace, searchPlace } from "../api/geocode";
 import type { GeoPick } from "../api/geocode";
 import { useI18n } from "../i18n";
 
@@ -27,8 +27,9 @@ function PlaceField(props: {
   value: GeoPick | null;
   onChange: (v: GeoPick | null) => void;
   placeholder: string;
+  action?: ReactNode;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<GeoPick[]>([]);
   const [open, setOpen] = useState(false);
@@ -48,7 +49,7 @@ function PlaceField(props: {
 
     setLoading(true);
     try {
-      const res = await searchPlace(next.trim());
+      const res = await searchPlace(next.trim(), { lang });
       setItems(res);
       setOpen(true);
     } finally {
@@ -58,8 +59,11 @@ function PlaceField(props: {
 
   return (
     <div className="grid" style={{ gap: 6, position: "relative" }}>
-      <div className="small" style={{ fontWeight: 900, color: "rgba(0,0,0,.7)" }}>
-        {props.label}
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <div className="small" style={{ fontWeight: 900, color: "rgba(0,0,0,.7)" }}>
+          {props.label}
+        </div>
+        {props.action}
       </div>
 
       <input
@@ -130,15 +134,46 @@ function PlaceField(props: {
 }
 
 export default function Home() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const nav = useNavigate();
 
   const [from, setFrom] = useState<GeoPick | null>(null);
   const [to, setTo] = useState<GeoPick | null>(null);
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [err, setErr] = useState("");
+  const [locating, setLocating] = useState(false);
 
   const canSearch = useMemo(() => !!from && !!to && !!date, [from, to, date]);
+  const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
+
+  async function setFromMyLocation() {
+    setErr("");
+    if (!("geolocation" in navigator)) {
+      setErr(trEn("Bu cihaz konum desteklemiyor.", "This device does not support location."));
+      return;
+    }
+    setLocating(true);
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          maximumAge: 3000,
+          timeout: 12000,
+        });
+      });
+
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const pick =
+        (await reversePlace(lat, lng, { lang })) ?? { label: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, lat, lng };
+
+      setFrom(pick);
+    } catch (e: any) {
+      setErr(e?.message || trEn("Konum alınamadı.", "Could not get location."));
+    } finally {
+      setLocating(false);
+    }
+  }
 
   return (
     <div className="container">
@@ -157,7 +192,22 @@ export default function Home() {
         <div className="card">
           <div className="cardPad grid" style={{ gap: 12 }}>
             <div className="grid2">
-              <PlaceField label={t("home.from")} value={from} onChange={setFrom} placeholder={t("home.ph.place")} />
+              <PlaceField
+                label={t("home.from")}
+                value={from}
+                onChange={setFrom}
+                placeholder={t("home.ph.place")}
+                action={
+                  <button
+                    className="btn"
+                    onClick={setFromMyLocation}
+                    disabled={locating}
+                    title={trEn("Konumum", "My location")}
+                  >
+                    {locating ? trEn("Alınıyor…", "Locating…") : trEn("Konumum", "My location")}
+                  </button>
+                }
+              />
               <PlaceField label={t("home.to")} value={to} onChange={setTo} placeholder={t("home.ph.place")} />
             </div>
 
