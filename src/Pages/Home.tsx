@@ -154,31 +154,62 @@ async function setFromMyLocation() {
     return;
   }
 
+  // Kayseri city-center sanity anchor (used only to reject obvious wrong-city fixes)
+  const KAYSERI = { lat: 38.732219, lng: 35.485281 }; // derived from 38°43'55.99"N, 35°29'7.01"E :contentReference[oaicite:0]{index=0}
+  const MAX_KM_FROM_KAYSERI = 80;
+
+  const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const R = 6371;
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+    const s1 = Math.sin(dLat / 2);
+    const s2 = Math.sin(dLng / 2);
+    const c =
+      s1 * s1 +
+      Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * s2 * s2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(c)));
+  };
+
   const geoErr = (e: any) => {
     const code = Number(e?.code || 0);
     if (code === 1) return trEn("Konum izni reddedildi.", "Location permission denied.");
-    if (code === 2) return trEn("Konum alınamadı (GPS kapalı olabilir).", "Position unavailable (GPS may be off).");
+    if (code === 2) return trEn("Konum alınamadı.", "Position unavailable.");
     if (code === 3) return trEn("Konum alma zaman aşımı.", "Location request timed out.");
     return String(e?.message || "") || trEn("Konum alınamadı.", "Could not get location.");
   };
 
   setLocating(true);
 
-  // Collect best accuracy for a short window (fixes “wrong city” from first coarse fix)
   const WINDOW_MS = 12000;
-  const MIN_GOOD_ACC = 80; // meters; lower = better
-  const WARN_ACC = 800; // if worse than this, show warning
+  const MIN_GOOD_ACC = 80; // meters (target) :contentReference[oaicite:1]{index=1}
+  const WARN_ACC = 800; // meters (warning threshold) :contentReference[oaicite:2]{index=2}
+
   let best: GeolocationPosition | null = null;
 
   const pickBest = (p: GeolocationPosition) => {
     if (!best) best = p;
-    else if ((p.coords.accuracy || 1e9) < (best.coords.accuracy || 1e9)) best = p;
+    else if ((p.coords.accuracy || 1e12) < (best.coords.accuracy || 1e12)) best = p;
   };
 
-  const done = async () => {
+  const finalize = async () => {
     if (!best) throw new Error(trEn("Konum alınamadı.", "Could not get location."));
     const lat = best.coords.latitude;
     const lng = best.coords.longitude;
+
+    const accRaw = best.coords.accuracy;
+    const acc = Number.isFinite(accRaw) ? Math.round(accRaw as number) : -1;
+
+    // 1) Reject “obviously wrong city” fixes, even if browser claims small accuracy
+    const kmFromKayseri = haversineKm({ lat, lng }, KAYSERI);
+    if (kmFromKayseri > MAX_KM_FROM_KAYSERI) {
+      setErr(
+        trEn(
+          `Konum Kayseri'den çok uzak görünüyor (~${kmFromKayseri.toFixed(0)} km). Lütfen adresi manuel seçin.`,
+          `Location looks far from Kayseri (~${kmFromKayseri.toFixed(0)} km). Please pick manually.`
+        )
+      );
+      return;
+    }
 
     const pick =
       (await reversePlace(lat, lng, { lang })) ?? {
@@ -187,17 +218,17 @@ async function setFromMyLocation() {
         lng,
       };
 
-    // Optional: append accuracy hint for transparency
-    const acc = Math.round(best.coords.accuracy || 0);
+    // Optional transparency (shows user what browser claims)
     if (acc > 0) pick.label = `${pick.label} (±${acc}m)`;
 
     setFrom(pick);
 
-    if (acc >= WARN_ACC) {
+    // 2) Warn on low/unknown accuracy (some browsers may provide odd/0 values)
+    if (acc <= 0 || acc >= WARN_ACC) {
       setErr(
         trEn(
-          "Konum hassas değil (GPS/Precise Location açın veya adresi manuel seçin).",
-          "Low accuracy (enable GPS/Precise Location or pick the address manually)."
+          "Konum hassas değil (GPS/konum servislerini açın veya adresi manuel seçin).",
+          "Low accuracy (enable location services or pick manually)."
         )
       );
     }
@@ -206,27 +237,20 @@ async function setFromMyLocation() {
   try {
     await new Promise<void>((resolve, reject) => {
       const start = Date.now();
-
       const watchId = navigator.geolocation.watchPosition(
         (p) => {
           pickBest(p);
-          const acc = p.coords.accuracy || 1e9;
-
-          // Stop early if we got a good fix
+          const acc = p.coords.accuracy || 1e12;
           if (acc <= MIN_GOOD_ACC || Date.now() - start >= WINDOW_MS) {
             navigator.geolocation.clearWatch(watchId);
-            done().then(resolve).catch(reject);
+            finalize().then(resolve).catch(reject);
           }
         },
         (e) => {
           navigator.geolocation.clearWatch(watchId);
           reject(e);
         },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 0, // avoid stale cached fix
-          timeout: WINDOW_MS,
-        }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: WINDOW_MS }
       );
     });
   } catch (e: any) {
