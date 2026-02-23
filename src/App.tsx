@@ -35,7 +35,6 @@ function PhoneModal(props: {
 
   const firstBtnRef = useRef<HTMLAnchorElement | null>(null);
 
-  // ESC closes
   useEffect(() => {
     if (!props.open) return;
 
@@ -44,10 +43,8 @@ function PhoneModal(props: {
     };
     window.addEventListener("keydown", onKey);
 
-    // focus first action
     setTimeout(() => firstBtnRef.current?.focus(), 0);
 
-    // prevent background scroll
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -69,7 +66,6 @@ function PhoneModal(props: {
       aria-modal="true"
       aria-label={trEn("İletişim seçenekleri", "Contact options")}
       onMouseDown={(e) => {
-        // click outside closes
         if (e.target === e.currentTarget) props.onClose();
       }}
       style={{
@@ -83,13 +79,7 @@ function PhoneModal(props: {
         padding: 12,
       }}
     >
-      <div
-        className="card"
-        style={{
-          width: "min(440px, 100%)",
-          overflow: "hidden",
-        }}
-      >
+      <div className="card" style={{ width: "min(440px, 100%)", overflow: "hidden" }}>
         <div className="cardPad grid" style={{ gap: 12 }}>
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontWeight: 950, fontSize: 18 }}>{props.phoneDisplay}</div>
@@ -139,12 +129,8 @@ export default function App() {
 
   const phoneDisplay = "+90 530 595 90 38";
   const phoneE164 = "+9053059599038";
-
   const [phoneOpen, setPhoneOpen] = useState(false);
 
-  // Minimal hardening for “map overlaps header”:
-  // - sticky header with high z-index
-  // - ensure leaflet container stays below header
   const injectedCss = useMemo(
     () => `
       .topbar{ position: sticky; top: 0; z-index: 9999; transform: translateZ(0); }
@@ -167,17 +153,15 @@ export default function App() {
 
       <div className="topbar">
         <div className="brandRow">
-          {/* Brand/title routes to home */}
           <Link className="brand" to="/" aria-label={t("nav.search")} style={{ textDecoration: "none", color: "inherit" }}>
             <span style={{ width: 14, height: 14, borderRadius: 4, background: "var(--brand)" }} />
             <span>{t("brand.name")}</span>
           </Link>
 
-          {/* Phone next to title + opens modal */}
           <button
             className="btn"
             onClick={() => setPhoneOpen(true)}
-            aria-label={t("nav.phone") ?? "Phone"}
+            aria-label={phoneDisplay} // fixed: no i18n key needed
             title={phoneDisplay}
             style={{
               display: "inline-flex",
