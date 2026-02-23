@@ -1,4 +1,4 @@
-// src/components/PickFromMapModal.tsx
+// src/components/PickFromMapModal.tsx  (FULL - fixes stale/disposed Leaflet mapRef + keeps dropdown stable + SVG icons)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
@@ -7,49 +7,7 @@ import type { GeoPick } from "../api/geocode";
 import { useI18n } from "../i18n";
 
 type LatLng = { lat: number; lng: number };
-
-function MapRefBinder({ onMap }: { onMap: (m: LeafletMap) => void }) {
-  const map = useMap();
-  useEffect(() => onMap(map), [map, onMap]);
-  return null;
-}
-
-function CenterTracker({ onCenter }: { onCenter: (c: LatLng) => void }) {
-  useMapEvents({
-    moveend: (e) => {
-      const c = e.target.getCenter();
-      onCenter({ lat: c.lat, lng: c.lng });
-    },
-    click: (e) => {
-      e.target.setView(e.latlng, e.target.getZoom());
-      onCenter({ lat: e.latlng.lat, lng: e.latlng.lng });
-    },
-  });
-  return null;
-}
-
-function loadLastCenter(): LatLng | null {
-  try {
-    const raw = localStorage.getItem("kpt_pick_center");
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    const lat = Number(obj?.lat);
-    const lng = Number(obj?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-    return { lat, lng };
-  } catch {
-    return null;
-  }
-}
-
-function saveLastCenter(c: LatLng) {
-  try {
-    localStorage.setItem("kpt_pick_center", JSON.stringify({ lat: c.lat, lng: c.lng }));
-  } catch {
-    // ignore
-  }
-}
+type PendingView = { lat: number; lng: number; zoom: number };
 
 function IconCrosshair({ size = 18 }: { size?: number }) {
   return (
@@ -81,6 +39,29 @@ function IconPin({ size = 18 }: { size?: number }) {
   );
 }
 
+function loadLastCenter(): LatLng | null {
+  try {
+    const raw = localStorage.getItem("kpt_pick_center");
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    const lat = Number(obj?.lat);
+    const lng = Number(obj?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
+function saveLastCenter(c: LatLng) {
+  try {
+    localStorage.setItem("kpt_pick_center", JSON.stringify({ lat: c.lat, lng: c.lng }));
+  } catch {
+    // ignore
+  }
+}
+
 async function getPos(timeoutMs: number, enableHighAccuracy: boolean): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -89,6 +70,44 @@ async function getPos(timeoutMs: number, enableHighAccuracy: boolean): Promise<G
       timeout: timeoutMs,
     });
   });
+}
+
+function CenterTracker({ onCenter }: { onCenter: (c: LatLng) => void }) {
+  useMapEvents({
+    moveend: (e) => {
+      const c = e.target.getCenter();
+      onCenter({ lat: c.lat, lng: c.lng });
+    },
+    click: (e) => {
+      e.target.setView(e.latlng, e.target.getZoom());
+      onCenter({ lat: e.latlng.lat, lng: e.latlng.lng });
+    },
+  });
+  return null;
+}
+
+// Binds Leaflet map instance and applies any pending view safely
+function MapRefBinder({
+  onMap,
+  applyPending,
+}: {
+  onMap: (m: LeafletMap) => void;
+  applyPending: (m: LeafletMap) => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    onMap(map);
+    // Important: invalidate size after mount (modal open) to avoid Leaflet internal pos errors
+    requestAnimationFrame(() => {
+      try {
+        map.invalidateSize();
+      } catch {
+        // ignore
+      }
+      applyPending(map);
+    });
+  }, [map, onMap, applyPending]);
+  return null;
 }
 
 export function PickFromMapModal(props: {
@@ -101,15 +120,9 @@ export function PickFromMapModal(props: {
   const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
 
   const mapRef = useRef<LeafletMap | null>(null);
-  const bindMap = useCallback((m: LeafletMap) => {
-    mapRef.current = m;
-  }, []);
+  const pendingViewRef = useRef<PendingView | null>(null);
 
-  const [center, setCenter] = useState<LatLng>(() => {
-    // global default; user can search anywhere
-    return props.initial ?? loadLastCenter() ?? { lat: 20, lng: 0 };
-  });
-
+  const [center, setCenter] = useState<LatLng>(() => props.initial ?? loadLastCenter() ?? { lat: 20, lng: 0 });
   const [q, setQ] = useState("");
   const [items, setItems] = useState<GeoPick[]>([]);
   const [searching, setSearching] = useState(false);
@@ -118,31 +131,67 @@ export function PickFromMapModal(props: {
 
   const listOpen = useMemo(() => items.length > 0, [items]);
 
-  useEffect(() => {
-    if (!props.open) return;
+  const safeSetView = useCallback((lat: number, lng: number, zoom: number) => {
+    const m = mapRef.current;
+    // If map is not mounted or container is gone, defer (fixes “disposed map” reopen crash)
+    try {
+      const container = m?.getContainer?.();
+      const usable = !!m && !!container && (container as any).isConnected !== false;
+      if (!usable) {
+        pendingViewRef.current = { lat, lng, zoom };
+        return;
+      }
+      m!.setView([lat, lng], zoom, { animate: false });
+      m!.invalidateSize();
+    } catch {
+      pendingViewRef.current = { lat, lng, zoom };
+    }
+  }, []);
 
+  const bindMap = useCallback((m: LeafletMap) => {
+    mapRef.current = m;
+  }, []);
+
+  const applyPending = useCallback(
+    (m: LeafletMap) => {
+      const pv = pendingViewRef.current;
+      if (!pv) return;
+      pendingViewRef.current = null;
+      try {
+        m.setView([pv.lat, pv.lng], pv.zoom, { animate: false });
+        m.invalidateSize();
+      } catch {
+        // ignore
+      }
+    },
+    []
+  );
+
+  // Open/close lifecycle: clear stale map ref on close; set an initial pending view on open
+  useEffect(() => {
+    if (props.open) {
+      setErr("");
+
+      const init = props.initial ?? loadLastCenter() ?? center;
+      const z = props.initial ? 15 : 3;
+      setCenter(init);
+      pendingViewRef.current = { lat: init.lat, lng: init.lng, zoom: z };
+
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") props.onClose();
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }
+
+    // closing: prevent calling setView on disposed instance
+    mapRef.current = null;
+    pendingViewRef.current = null;
+    setItems([]);
+    setSearching(false);
+    setBusy(false);
     setErr("");
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") props.onClose();
-    };
-    window.addEventListener("keydown", onKey);
-
-    // Ensure map centers when opening
-    setTimeout(() => {
-      mapRef.current?.setView?.([center.lat, center.lng], props.initial ? 15 : 3);
-    }, 0);
-
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.open]);
-
-  useEffect(() => {
-    if (!props.open) return;
-    if (!props.initial) return;
-    setCenter(props.initial);
-    mapRef.current?.setView?.([props.initial.lat, props.initial.lng], 15);
-  }, [props.open, props.initial]);
+  }, [props.open]); // intentionally minimal
 
   function updateCenter(c: LatLng) {
     setCenter(c);
@@ -181,15 +230,13 @@ export function PickFromMapModal(props: {
 
     setBusy(true);
     try {
-      // Run both concurrently (high + low accuracy) with the same 3s cap.
-      // First success wins; avoids “never returns” on desktops.
       const timeoutMs = 3000;
+      // parallel high+low accuracy, first success wins (3s cap)
       const pos = await Promise.any([getPos(timeoutMs, true), getPos(timeoutMs, false)]);
-
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
 
-      mapRef.current?.setView?.([lat, lng], 16);
+      safeSetView(lat, lng, 16);
       updateCenter({ lat, lng });
     } catch (e: any) {
       const code = Number(e?.code || 0);
@@ -212,7 +259,6 @@ export function PickFromMapModal(props: {
           lat: center.lat,
           lng: center.lng,
         };
-
       props.onPick(pick);
       props.onClose();
     } catch {
@@ -242,14 +288,7 @@ export function PickFromMapModal(props: {
         padding: 12,
       }}
     >
-      <div
-        className="card"
-        style={{
-          width: "min(920px, 100%)",
-          maxHeight: "min(92vh, 980px)",
-          overflow: "hidden",
-        }}
-      >
+      <div className="card" style={{ width: "min(920px, 100%)", maxHeight: "min(92vh, 980px)", overflow: "hidden" }}>
         <div className="cardPad grid" style={{ gap: 10 }}>
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontWeight: 950, fontSize: 18 }}>{trEn("Haritadan seç", "Pick from map")}</div>
@@ -258,7 +297,7 @@ export function PickFromMapModal(props: {
             </button>
           </div>
 
-          {/* Search row (higher stacking than the map) */}
+          {/* Search row (kept above map) */}
           <div style={{ position: "relative", zIndex: 50 }}>
             <div className="row" style={{ gap: 8, alignItems: "stretch" }}>
               <input
@@ -289,7 +328,7 @@ export function PickFromMapModal(props: {
               </div>
             )}
 
-            {/* Keep list open; never auto-close on blur (fixes “fraction of a second” issue) */}
+            {/* No blur-close; closes only on selection or query < 3 */}
             {listOpen && (
               <div
                 className="card"
@@ -321,10 +360,10 @@ export function PickFromMapModal(props: {
                     }}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
-                      mapRef.current?.setView?.([it.lat, it.lng], 16);
+                      safeSetView(it.lat, it.lng, 16);
                       updateCenter({ lat: it.lat, lng: it.lng });
                       setQ(it.label);
-                      setItems([]); // closes list deterministically
+                      setItems([]); // deterministic close
                     }}
                   >
                     <div style={{ fontWeight: 850 }}>{it.label}</div>
@@ -337,16 +376,7 @@ export function PickFromMapModal(props: {
             )}
           </div>
 
-          {/* Map (lower stacking than dropdown) */}
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              borderRadius: 14,
-              overflow: "hidden",
-              border: "1px solid var(--border)",
-            }}
-          >
+          <div style={{ position: "relative", zIndex: 1, borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
             <MapContainer
               center={[center.lat, center.lng]}
               zoom={props.initial ? 15 : 3}
@@ -356,11 +386,10 @@ export function PickFromMapModal(props: {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <MapRefBinder onMap={bindMap} />
+              <MapRefBinder onMap={bindMap} applyPending={applyPending} />
               <CenterTracker onCenter={updateCenter} />
             </MapContainer>
 
-            {/* Center pin (SVG; always renders) */}
             <div
               style={{
                 position: "absolute",
@@ -377,7 +406,6 @@ export function PickFromMapModal(props: {
               <IconPin size={28} />
             </div>
 
-            {/* Center dot */}
             <div
               style={{
                 position: "absolute",
