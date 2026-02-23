@@ -9,6 +9,11 @@ import { useI18n } from "../i18n";
 type LatLng = { lat: number; lng: number };
 type PendingView = { lat: number; lng: number; zoom: number };
 
+const DEFAULT_CENTER: LatLng = {
+  lat: 38.72728491733775,
+  lng: 35.51863680066396,
+};
+
 function IconCrosshair({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -122,7 +127,7 @@ export function PickFromMapModal(props: {
   const mapRef = useRef<LeafletMap | null>(null);
   const pendingViewRef = useRef<PendingView | null>(null);
 
-  const [center, setCenter] = useState<LatLng>(() => props.initial ?? loadLastCenter() ?? { lat: 20, lng: 0 });
+  const [center, setCenter] = useState<LatLng>(() => props.initial ?? loadLastCenter() ?? DEFAULT_CENTER);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<GeoPick[]>([]);
   const [searching, setSearching] = useState(false);
@@ -169,29 +174,28 @@ export function PickFromMapModal(props: {
 
   // Open/close lifecycle: clear stale map ref on close; set an initial pending view on open
   useEffect(() => {
-    if (props.open) {
-      setErr("");
-
-      const init = props.initial ?? loadLastCenter() ?? center;
-      const z = props.initial ? 15 : 3;
-      setCenter(init);
-      pendingViewRef.current = { lat: init.lat, lng: init.lng, zoom: z };
-
-      const onKey = (e: KeyboardEvent) => {
-        if (e.key === "Escape") props.onClose();
-      };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }
-
-    // closing: prevent calling setView on disposed instance
-    mapRef.current = null;
-    pendingViewRef.current = null;
-    setItems([]);
-    setSearching(false);
-    setBusy(false);
+  if (props.open) {
     setErr("");
-  }, [props.open]); // intentionally minimal
+
+    const init = props.initial ?? loadLastCenter() ?? DEFAULT_CENTER;
+    const z = props.initial ? 15 : 15; // default zoom for Kayseri start
+    setCenter(init);
+    pendingViewRef.current = { lat: init.lat, lng: init.lng, zoom: z };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") props.onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }
+
+     mapRef.current = null;
+  pendingViewRef.current = null;
+  setItems([]);
+  setSearching(false);
+  setBusy(false);
+  setErr("");
+}, [props.open]);
 
   function updateCenter(c: LatLng) {
     setCenter(c);
