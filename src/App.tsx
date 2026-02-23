@@ -172,7 +172,7 @@ export default function App() {
   const { t } = useI18n();
 
   const phoneDisplay = "+90 530 595 90 38";
-  const phoneE164 = "+9053059599038";
+  const phoneE164 = "+905305959038";
   const [phoneOpen, setPhoneOpen] = useState(false);
 
   const injectedCss = useMemo(
