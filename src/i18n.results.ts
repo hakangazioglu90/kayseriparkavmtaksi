@@ -32,7 +32,7 @@ export type ResultsKey = (typeof KEYS)[number];
 
 const EN: Record<ResultsKey, string> = {
   "results.date": "Date",
-  "results.editSearch": "Edit search",
+  "results.editSearch": "Search Again",
 
   "results.kpi.distance": "Distance: {km} km",
   "results.kpi.available": "Available: {n}",
@@ -57,7 +57,7 @@ const EN: Record<ResultsKey, string> = {
 
 const TR: Record<ResultsKey, string> = {
   "results.date": "Tarih",
-  "results.editSearch": "Aramayı düzenle",
+  "results.editSearch": "Tekrar Ara",
 
   "results.kpi.distance": "Mesafe: {km} km",
   "results.kpi.available": "Uygun: {n}",
