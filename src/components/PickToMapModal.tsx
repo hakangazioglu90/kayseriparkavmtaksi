@@ -1,4 +1,5 @@
-// src/components/PickFromMapModal.tsx
+// src/components/PickToMapModal.tsx
+// Same rule applied: default is always DEFAULT_CENTER unless explicit initial or User presses locate.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
@@ -104,7 +105,7 @@ function MapRefBinder({
   return null;
 }
 
-export function PickFromMapModal(props: {
+export function PickToMapModal(props: {
   open: boolean;
   initial?: LatLng | null;
   onClose: () => void;
@@ -116,7 +117,6 @@ export function PickFromMapModal(props: {
   const mapRef = useRef<LeafletMap | null>(null);
   const pendingViewRef = useRef<PendingView | null>(null);
 
-  // IMPORTANT RULE (User request): no auto-load from anywhere except DEFAULT_CENTER or explicit initial.
   const [center, setCenter] = useState<LatLng>(() => props.initial ?? DEFAULT_CENTER);
 
   const [q, setQ] = useState("");
@@ -167,7 +167,6 @@ export function PickFromMapModal(props: {
       setSearching(false);
       setBusy(false);
 
-      // Only DEFAULT_CENTER unless explicit initial is provided.
       const init = props.initial ?? DEFAULT_CENTER;
       setCenter(init);
       pendingViewRef.current = { lat: init.lat, lng: init.lng, zoom: 15 };
@@ -185,7 +184,7 @@ export function PickFromMapModal(props: {
     setSearching(false);
     setBusy(false);
     setErr("");
-  }, [props.open]); // keep minimal
+  }, [props.open]);
 
   function updateCenter(c: LatLng) {
     setCenter(c);
@@ -283,7 +282,7 @@ export function PickFromMapModal(props: {
       <div className="card" style={{ width: "min(920px, 100%)", maxHeight: "min(92vh, 980px)", overflow: "hidden" }}>
         <div className="cardPad grid" style={{ gap: 10 }}>
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontWeight: 950, fontSize: 18 }}>{trEn("Haritadan seç", "Pick from map")}</div>
+            <div style={{ fontWeight: 950, fontSize: 18 }}>{trEn("Varış noktasını seç", "Pick destination")}</div>
             <button className="btn" onClick={props.onClose} disabled={busy} aria-label={trEn("Kapat", "Close")}>
               ✕
             </button>
@@ -295,7 +294,7 @@ export function PickFromMapModal(props: {
                 className="input"
                 value={q}
                 onChange={(e) => runSearch(e.target.value)}
-                placeholder={trEn("Yer ara (örn: Melikgazi)", "Search place (e.g. Melikgazi)")}
+                placeholder={trEn("Yer ara (örn: Talas)", "Search place (e.g. Talas)")}
                 autoComplete="off"
                 inputMode="search"
                 style={{ flex: 1 }}

@@ -1,10 +1,11 @@
-// src/Pages/Home.tsx  (FULL)
+// src/Pages/Home.tsx  (FULL) — updated to use PickToMapModal for "to"
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { searchPlace } from "../api/geocode";
 import type { GeoPick } from "../api/geocode";
 import { useI18n } from "../i18n";
 import { PickFromMapModal } from "../components/PickFromMapModal";
+import { PickToMapModal } from "../components/PickToMapModal";
 
 function Stepper() {
   const { t } = useI18n();
@@ -43,7 +44,7 @@ function PlaceField(props: {
   value: GeoPick | null;
   onChange: (v: GeoPick | null) => void;
   placeholder: string;
-  action?: ReactNode; // rendered to the right of input (aligned vertically)
+  action?: ReactNode;
 }) {
   const { t, lang } = useI18n();
   const [q, setQ] = useState("");
@@ -160,7 +161,8 @@ export default function Home() {
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [err, setErr] = useState("");
 
-  const [pickOpen, setPickOpen] = useState(false);
+  const [pickFromOpen, setPickFromOpen] = useState(false);
+  const [pickToOpen, setPickToOpen] = useState(false);
 
   const canSearch = useMemo(() => !!from && !!to && !!date, [from, to, date]);
   const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
@@ -168,12 +170,22 @@ export default function Home() {
   return (
     <div className="container">
       <PickFromMapModal
-        open={pickOpen}
+        open={pickFromOpen}
         initial={from ? { lat: from.lat, lng: from.lng } : null}
-        onClose={() => setPickOpen(false)}
+        onClose={() => setPickFromOpen(false)}
         onPick={(pick) => {
           setErr("");
           setFrom(pick);
+        }}
+      />
+
+      <PickToMapModal
+        open={pickToOpen}
+        initial={to ? { lat: to.lat, lng: to.lng } : null}
+        onClose={() => setPickToOpen(false)}
+        onPick={(pick) => {
+          setErr("");
+          setTo(pick);
         }}
       />
 
@@ -200,21 +212,33 @@ export default function Home() {
                 action={
                   <button
                     className="btn"
-                    onClick={() => setPickOpen(true)}
+                    onClick={() => setPickFromOpen(true)}
                     title={trEn("Haritadan seç", "Pick from map")}
                     aria-label={trEn("Haritadan seç", "Pick from map")}
-                    style={{
-                      minWidth: 46,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+                    style={{ minWidth: 46, display: "flex", alignItems: "center", justifyContent: "center" }}
                   >
                     <IconCrosshair />
                   </button>
                 }
               />
-              <PlaceField label={t("home.to")} value={to} onChange={setTo} placeholder={t("home.ph.place")} />
+
+              <PlaceField
+                label={t("home.to")}
+                value={to}
+                onChange={setTo}
+                placeholder={t("home.ph.place")}
+                action={
+                  <button
+                    className="btn"
+                    onClick={() => setPickToOpen(true)}
+                    title={trEn("Haritadan seç", "Pick from map")}
+                    aria-label={trEn("Haritadan seç", "Pick from map")}
+                    style={{ minWidth: 46, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    <IconCrosshair />
+                  </button>
+                }
+              />
             </div>
 
             <div className="row" style={{ justifyContent: "space-between" }}>
