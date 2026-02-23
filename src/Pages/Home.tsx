@@ -1,22 +1,11 @@
 // src/Pages/Home.tsx  (FULL)
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Map as LeafletMap } from "leaflet";
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { reversePlace, searchPlace } from "../api/geocode";
+import { searchPlace } from "../api/geocode";
 import type { GeoPick } from "../api/geocode";
 import { useI18n } from "../i18n";
+import { PickFromMapModal } from "../components/PickFromMapModal";
 
-// Uses react-leaflet (already in project via RouteMap)
-
-type LatLng = { lat: number; lng: number };
-function MapRefBinder({ onMap }: { onMap: (m: LeafletMap) => void }) {
-  const map = useMap();
-  useEffect(() => {
-    onMap(map);
-  }, [map, onMap]);
-  return null;
-}
 function Stepper() {
   const { t } = useI18n();
   return (
@@ -31,6 +20,21 @@ function Stepper() {
         <span className="dot">3</span> {t("step.confirm")}
       </div>
     </div>
+  );
+}
+
+function IconCrosshair({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M12 2v3m0 14v3M2 12h3m14 0h3M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path d="M12 11v2m-1-1h2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -147,335 +151,6 @@ function PlaceField(props: {
   );
 }
 
-function loadLastCenter(): LatLng | null {
-  try {
-    const raw = localStorage.getItem("kpt_pick_center");
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    const lat = Number(obj?.lat);
-    const lng = Number(obj?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-    return { lat, lng };
-  } catch {
-    return null;
-  }
-}
-
-function saveLastCenter(c: LatLng) {
-  try {
-    localStorage.setItem("kpt_pick_center", JSON.stringify({ lat: c.lat, lng: c.lng }));
-  } catch {
-    // ignore
-  }
-}
-
-function CenterTracker(props: { onCenter: (c: LatLng) => void }) {
-  useMapEvents({
-    moveend: (e) => {
-      const map = e.target;
-      const c = map.getCenter();
-      props.onCenter({ lat: c.lat, lng: c.lng });
-    },
-    click: (e) => {
-      const map = e.target;
-      map.setView(e.latlng, map.getZoom());
-      props.onCenter({ lat: e.latlng.lat, lng: e.latlng.lng });
-    },
-  });
-  return null;
-}
-
-function PickFromMapModal(props: {
-  open: boolean;
-  initial?: LatLng | null;
-  onClose: () => void;
-  onPick: (pick: GeoPick) => void;
-}) {
-  const { lang } = useI18n();
-  const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
-const mapRef = useRef<LeafletMap | null>(null);
-const bindMap = useCallback((m: LeafletMap) => {
-  mapRef.current = m;
-}, []);
-
-  const [center, setCenter] = useState<LatLng>(() => {
-    return props.initial ?? loadLastCenter() ?? { lat: 39.0, lng: 35.0 }; // generic TR-ish starting point; user can search anywhere
-  });
-
-  const [q, setQ] = useState("");
-  const [items, setItems] = useState<GeoPick[]>([]);
-  const [listOpen, setListOpen] = useState(false);
-  const [searching, setSearching] = useState(false);
-
-  const [busy, setBusy] = useState(false);
-  const [findErr, setFindErr] = useState("");
-
-  useEffect(() => {
-    if (!props.open) return;
-    setFindErr("");
-    // If opened and we have a stored/initial center, ensure map uses it
-    setTimeout(() => {
-      mapRef.current?.setView?.([center.lat, center.lng], 14);
-    }, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.open]);
-
-  function updateCenter(c: LatLng) {
-    setCenter(c);
-    saveLastCenter(c);
-  }
-
-  async function runSearch(next: string) {
-    setQ(next);
-    setFindErr("");
-
-    if (next.trim().length < 3) {
-      setItems([]);
-      setListOpen(false);
-      return;
-    }
-
-    setSearching(true);
-    try {
-      const res = await searchPlace(next.trim(), { lang });
-      setItems(res);
-      setListOpen(true);
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  async function findMeMax3s() {
-    setFindErr("");
-
-    if (!("geolocation" in navigator)) {
-      setFindErr(trEn("Bu cihaz konum desteklemiyor.", "This device does not support location."));
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 3000, // max 3 seconds as requested
-        });
-      });
-
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-
-      mapRef.current?.setView?.([lat, lng], 16);
-      updateCenter({ lat, lng });
-    } catch (e: any) {
-      const code = Number(e?.code || 0);
-      if (code === 1) setFindErr(trEn("Konum izni reddedildi.", "Location permission denied."));
-      else if (code === 2) setFindErr(trEn("Konum alınamadı.", "Position unavailable."));
-      else if (code === 3) setFindErr(trEn("Zaman aşımı (3 sn).", "Timed out (3s)."));
-      else setFindErr(String(e?.message || "") || trEn("Konum alınamadı.", "Could not get location."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function useThisPin() {
-    setFindErr("");
-    setBusy(true);
-    try {
-      const pick =
-        (await reversePlace(center.lat, center.lng, { lang })) ?? {
-          label: `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`,
-          lat: center.lat,
-          lng: center.lng,
-        };
-
-      props.onPick(pick);
-      props.onClose();
-    } catch (e: any) {
-      setFindErr(String(e?.message || "") || trEn("Adres çözümlenemedi.", "Could not resolve address."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (!props.open) return null;
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        background: "rgba(0,0,0,.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 12,
-      }}
-    >
-      <div
-        className="card"
-        style={{
-          width: "min(920px, 100%)",
-          maxHeight: "min(92vh, 980px)",
-          overflow: "hidden",
-        }}
-      >
-        <div className="cardPad grid" style={{ gap: 10 }}>
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontWeight: 950, fontSize: 18 }}>{trEn("Haritadan seç", "Pick from map")}</div>
-            <button className="btn" onClick={props.onClose} disabled={busy} aria-label={trEn("Kapat", "Close")}>
-              ✕
-            </button>
-          </div>
-
-          <div style={{ position: "relative" }}>
-            <div className="row" style={{ gap: 8, alignItems: "stretch" }}>
-              <input
-                className="input"
-                value={q}
-                onChange={(e) => runSearch(e.target.value)}
-                placeholder={trEn("Yer ara (örn: Melikgazi)", "Search place (e.g. Melikgazi)")}
-                onFocus={() => items.length && setListOpen(true)}
-                onBlur={() => setTimeout(() => setListOpen(false), 150)}
-                autoComplete="off"
-                inputMode="search"
-                style={{ flex: 1 }}
-              />
-              <button className="btn" onClick={findMeMax3s} disabled={busy} title={trEn("Beni bul (3 sn)", "Find me (3s)")}>
-                ⌖
-              </button>
-            </div>
-
-            {searching && (
-              <div className="small" style={{ marginTop: 6 }} aria-live="polite">
-                {trEn("Aranıyor…", "Searching…")}
-              </div>
-            )}
-
-            {listOpen && items.length > 0 && (
-              <div
-                className="card"
-                role="listbox"
-                style={{
-                  position: "absolute",
-                  top: 54,
-                  left: 0,
-                  right: 0,
-                  maxHeight: 260,
-                  overflow: "auto",
-                  zIndex: 50,
-                  background: "#fff",
-                }}
-              >
-                {items.map((it, idx) => (
-                  <button
-                    key={`${it.lat}-${it.lng}-${idx}`}
-                    className="btn"
-                    role="option"
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      border: "0",
-                      borderBottom: idx === items.length - 1 ? "0" : "1px solid var(--border)",
-                      borderRadius: 0,
-                      padding: "12px 12px",
-                      background: "#fff",
-                    }}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      mapRef.current?.setView?.([it.lat, it.lng], 16);
-                      updateCenter({ lat: it.lat, lng: it.lng });
-                      setQ(it.label);
-                      setListOpen(false);
-                    }}
-                  >
-                    <div style={{ fontWeight: 850 }}>{it.label}</div>
-                    <div className="small">
-                      {it.lat.toFixed(5)}, {it.lng.toFixed(5)}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
-           <MapContainer center={[center.lat, center.lng]} zoom={14} style={{ width: "100%", height: "min(54vh, 520px)" }}>
-  <TileLayer
-    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-  />
-  <MapRefBinder onMap={bindMap} />
-  <CenterTracker onCenter={updateCenter} />
-</MapContainer>;
-
-            {/* Fixed pin at map center */}
-            <div
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -100%)",
-                pointerEvents: "none",
-                zIndex: 1000,
-                fontSize: 28,
-                filter: "drop-shadow(0 4px 8px rgba(0,0,0,.35))",
-              }}
-              aria-hidden="true"
-            >
-              📍
-            </div>
-
-            {/* tiny crosshair center */}
-            <div
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                width: 10,
-                height: 10,
-                borderRadius: 999,
-                border: "2px solid rgba(0,0,0,.85)",
-                background: "rgba(255,255,255,.6)",
-                pointerEvents: "none",
-                zIndex: 1000,
-              }}
-              aria-hidden="true"
-            />
-          </div>
-
-          <div className="small" style={{ opacity: 0.85 }}>
-            {trEn("Haritayı sürükleyin veya tıklayın; iğne ortayı gösterir.", "Drag or click the map; the pin marks the center.")}
-            {" — "}
-            {center.lat.toFixed(5)}, {center.lng.toFixed(5)}
-          </div>
-
-          {findErr && <div style={{ color: "var(--bad)", fontWeight: 800 }}>{findErr}</div>}
-
-          <div className="row" style={{ justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-            <button className="btn" onClick={props.onClose} disabled={busy}>
-              {trEn("İptal", "Cancel")}
-            </button>
-
-            <button className="btn btnPrimary" onClick={useThisPin} disabled={busy}>
-              {busy ? trEn("Seçiliyor…", "Selecting…") : trEn("Bu konumu kullan", "Use this location")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   const { t, lang } = useI18n();
   const nav = useNavigate();
@@ -490,17 +165,11 @@ export default function Home() {
   const canSearch = useMemo(() => !!from && !!to && !!date, [from, to, date]);
   const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
 
-  const initialForPicker = useMemo<LatLng | null>(() => {
-    if (from) return { lat: from.lat, lng: from.lng };
-    const last = loadLastCenter();
-    return last ?? null;
-  }, [from]);
-
   return (
     <div className="container">
       <PickFromMapModal
         open={pickOpen}
-        initial={initialForPicker}
+        initial={from ? { lat: from.lat, lng: from.lng } : null}
         onClose={() => setPickOpen(false)}
         onPick={(pick) => {
           setErr("");
@@ -541,7 +210,7 @@ export default function Home() {
                       justifyContent: "center",
                     }}
                   >
-                    ⌖
+                    <IconCrosshair />
                   </button>
                 }
               />
