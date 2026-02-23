@@ -146,20 +146,8 @@ export default function Home() {
   const canSearch = useMemo(() => !!from && !!to && !!date, [from, to, date]);
   const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
 
-  // src/Pages/Home.tsx  — replace ONLY setFromMyLocation() with this version
 async function setFromMyLocation() {
   setErr("");
-
-  // Geolocation requires HTTPS (or localhost). LAN IP http://192.168.x.x is NOT allowed.
-  if (!window.isSecureContext) {
-    setErr(
-      trEn(
-        "Konum sadece HTTPS (veya localhost) üzerinde çalışır. Siteyi https:// ile açın.",
-        "Location works only on HTTPS (or localhost). Open the site with https://."
-      )
-    );
-    return;
-  }
 
   if (!("geolocation" in navigator)) {
     setErr(trEn("Bu cihaz konum desteklemiyor.", "This device does not support location."));
@@ -168,38 +156,29 @@ async function setFromMyLocation() {
 
   const geoErr = (e: any) => {
     const code = Number(e?.code || 0);
-    const msg = String(e?.message || "").trim();
-
     if (code === 1) return trEn("Konum izni reddedildi.", "Location permission denied.");
-    if (code === 2) return trEn("Konum bilgisi alınamadı (GPS kapalı olabilir).", "Position unavailable (GPS may be off).");
-    if (code === 3) return trEn("Konum alma zaman aşımına uğradı.", "Location request timed out.");
-    return msg || trEn("Konum alınamadı.", "Could not get location.");
+    if (code === 2) return trEn("Konum alınamadı (GPS kapalı olabilir).", "Position unavailable (GPS may be off).");
+    if (code === 3) return trEn("Konum alma zaman aşımı.", "Location request timed out.");
+    return String(e?.message || "") || trEn("Konum alınamadı.", "Could not get location.");
   };
 
-  const getPos = (opts: PositionOptions) =>
-    new Promise<GeolocationPosition>((resolve, reject) =>
-      navigator.geolocation.getCurrentPosition(resolve, reject, opts)
-    );
-
   setLocating(true);
-  try {
-    let pos: GeolocationPosition;
 
-    // Try high accuracy first (fast timeout)
-    try {
-      pos = await getPos({ enableHighAccuracy: true, maximumAge: 3000, timeout: 12000 });
-    } catch (e: any) {
-      // Retry with low accuracy + longer timeout (fixes many mobile cases)
-      const code = Number(e?.code || 0);
-      if (code === 2 || code === 3) {
-        pos = await getPos({ enableHighAccuracy: false, maximumAge: 600000, timeout: 25000 });
-      } else {
-        throw e;
-      }
-    }
+  // Collect best accuracy for a short window (fixes “wrong city” from first coarse fix)
+  const WINDOW_MS = 12000;
+  const MIN_GOOD_ACC = 80; // meters; lower = better
+  const WARN_ACC = 800; // if worse than this, show warning
+  let best: GeolocationPosition | null = null;
 
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+  const pickBest = (p: GeolocationPosition) => {
+    if (!best) best = p;
+    else if ((p.coords.accuracy || 1e9) < (best.coords.accuracy || 1e9)) best = p;
+  };
+
+  const done = async () => {
+    if (!best) throw new Error(trEn("Konum alınamadı.", "Could not get location."));
+    const lat = best.coords.latitude;
+    const lng = best.coords.longitude;
 
     const pick =
       (await reversePlace(lat, lng, { lang })) ?? {
@@ -208,7 +187,48 @@ async function setFromMyLocation() {
         lng,
       };
 
+    // Optional: append accuracy hint for transparency
+    const acc = Math.round(best.coords.accuracy || 0);
+    if (acc > 0) pick.label = `${pick.label} (±${acc}m)`;
+
     setFrom(pick);
+
+    if (acc >= WARN_ACC) {
+      setErr(
+        trEn(
+          "Konum hassas değil (GPS/Precise Location açın veya adresi manuel seçin).",
+          "Low accuracy (enable GPS/Precise Location or pick the address manually)."
+        )
+      );
+    }
+  };
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const start = Date.now();
+
+      const watchId = navigator.geolocation.watchPosition(
+        (p) => {
+          pickBest(p);
+          const acc = p.coords.accuracy || 1e9;
+
+          // Stop early if we got a good fix
+          if (acc <= MIN_GOOD_ACC || Date.now() - start >= WINDOW_MS) {
+            navigator.geolocation.clearWatch(watchId);
+            done().then(resolve).catch(reject);
+          }
+        },
+        (e) => {
+          navigator.geolocation.clearWatch(watchId);
+          reject(e);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0, // avoid stale cached fix
+          timeout: WINDOW_MS,
+        }
+      );
+    });
   } catch (e: any) {
     console.warn("geolocation error:", e);
     setErr(geoErr(e));
