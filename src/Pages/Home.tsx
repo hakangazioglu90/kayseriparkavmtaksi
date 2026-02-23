@@ -146,34 +146,76 @@ export default function Home() {
   const canSearch = useMemo(() => !!from && !!to && !!date, [from, to, date]);
   const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
 
-  async function setFromMyLocation() {
-    setErr("");
-    if (!("geolocation" in navigator)) {
-      setErr(trEn("Bu cihaz konum desteklemiyor.", "This device does not support location."));
-      return;
-    }
-    setLocating(true);
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          maximumAge: 3000,
-          timeout: 12000,
-        });
-      });
+  // src/Pages/Home.tsx  — replace ONLY setFromMyLocation() with this version
+async function setFromMyLocation() {
+  setErr("");
 
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const pick =
-        (await reversePlace(lat, lng, { lang })) ?? { label: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, lat, lng };
-
-      setFrom(pick);
-    } catch (e: any) {
-      setErr(e?.message || trEn("Konum alınamadı.", "Could not get location."));
-    } finally {
-      setLocating(false);
-    }
+  // Geolocation requires HTTPS (or localhost). LAN IP http://192.168.x.x is NOT allowed.
+  if (!window.isSecureContext) {
+    setErr(
+      trEn(
+        "Konum sadece HTTPS (veya localhost) üzerinde çalışır. Siteyi https:// ile açın.",
+        "Location works only on HTTPS (or localhost). Open the site with https://."
+      )
+    );
+    return;
   }
+
+  if (!("geolocation" in navigator)) {
+    setErr(trEn("Bu cihaz konum desteklemiyor.", "This device does not support location."));
+    return;
+  }
+
+  const geoErr = (e: any) => {
+    const code = Number(e?.code || 0);
+    const msg = String(e?.message || "").trim();
+
+    if (code === 1) return trEn("Konum izni reddedildi.", "Location permission denied.");
+    if (code === 2) return trEn("Konum bilgisi alınamadı (GPS kapalı olabilir).", "Position unavailable (GPS may be off).");
+    if (code === 3) return trEn("Konum alma zaman aşımına uğradı.", "Location request timed out.");
+    return msg || trEn("Konum alınamadı.", "Could not get location.");
+  };
+
+  const getPos = (opts: PositionOptions) =>
+    new Promise<GeolocationPosition>((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, opts)
+    );
+
+  setLocating(true);
+  try {
+    let pos: GeolocationPosition;
+
+    // Try high accuracy first (fast timeout)
+    try {
+      pos = await getPos({ enableHighAccuracy: true, maximumAge: 3000, timeout: 12000 });
+    } catch (e: any) {
+      // Retry with low accuracy + longer timeout (fixes many mobile cases)
+      const code = Number(e?.code || 0);
+      if (code === 2 || code === 3) {
+        pos = await getPos({ enableHighAccuracy: false, maximumAge: 600000, timeout: 25000 });
+      } else {
+        throw e;
+      }
+    }
+
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    const pick =
+      (await reversePlace(lat, lng, { lang })) ?? {
+        label: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        lat,
+        lng,
+      };
+
+    setFrom(pick);
+  } catch (e: any) {
+    console.warn("geolocation error:", e);
+    setErr(geoErr(e));
+  } finally {
+    setLocating(false);
+  }
+}
 
   return (
     <div className="container">
