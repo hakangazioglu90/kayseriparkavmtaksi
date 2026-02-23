@@ -38,23 +38,26 @@ function IconPhone({ size = 22 }: { size?: number }) {
   );
 }
 
+// src/App.tsx — replace ONLY IconWhatsApp() with this version
 function IconWhatsApp({ size = 22 }: { size?: number }) {
-  // Generic chat+phone mark (WhatsApp-like without text)
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {/* bubble */}
       <path
-        d="M20 11.5A7.5 7.5 0 0 1 8.9 18.2L5 19l.9-3.8A7.5 7.5 0 1 1 20 11.5Z"
+        d="M12 2a9.5 9.5 0 0 0-8.1 14.4L3 22l5.7-1.5A9.5 9.5 0 1 0 12 2Z"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinejoin="round"
       />
+      {/* phone handset (simplified WhatsApp-style) */}
       <path
-        d="M10 9.8c.2-.5.7-.8 1.2-.6l.8.3c.4.2.6.6.5 1l-.2.6c.6.9 1.3 1.6 2.2 2.2l.6-.2c.4-.1.8.1 1 .5l.3.8c.2.5-.1 1-.6 1.2c-1 .4-2.7.1-4.5-1.6c-1.7-1.8-2-3.5-1.6-4.5Z"
+        d="M9.3 8.8c.2-.5.7-.8 1.2-.6l.9.3c.4.1.7.5.7.9l.1.7c0 .2-.1.5-.2.6l-.4.5c.7 1.2 1.7 2.2 2.9 2.9l.5-.4c.2-.2.4-.2.6-.2l.7.1c.4.1.8.3.9.7l.3.9c.2.5-.1 1-.6 1.2c-1.3.6-3.7.1-6-2.2c-2.3-2.3-2.8-4.7-2.2-6Z"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinejoin="round"
+        strokeLinecap="round"
       />
     </svg>
   );
