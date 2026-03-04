@@ -28,11 +28,20 @@ export default function ActiveVehicles() {
   const [live, setLive] = useState<Record<string, Live>>({});
   const [filter, setFilter] = useState("");
 
-  useEffect(() => {
-    const r = dbRef(rtdb, "liveLocations");
-    const unsub = onValue(r, (snap) => setLive((snap.val() as any) || {}));
-    return () => unsub();
-  }, []);
+  // WEBSITE (ActiveVehicles.tsx) — REPLACE ONLY the useEffect to surface RTDB permission/config errors
+useEffect(() => {
+  const r = dbRef(rtdb, "liveLocations");
+  const unsub = onValue(
+    r,
+    (snap) => setLive((snap.val() as any) || {}),
+    (e) => {
+      // If rules deny read or DB URL is wrong, you will see it here
+      console.error("RTDB read failed:", e);
+      setLive({});
+    }
+  );
+  return () => unsub();
+}, []);
 
   const entries = useMemo(() => {
     const now = Date.now();
