@@ -35,47 +35,47 @@ img {
   max-width: 100%;
   display: block;
 }
-/* Add to your global CSS (or component CSS module) */
-
-/* same container behavior as the Vue sample */
-.langSwitch {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* Segmented container: curved ends only, merged middle */
+.langSeg{
+  display:inline-flex;
+  align-items:stretch;
+  border:1px solid var(--border);
+  border-radius:999px;
+  overflow:hidden;
+  background:#fff;
 }
 
-/* base button style similar to the site’s pill buttons */
-.langSwitch .langBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 8px 10px;
-
-  background: #fff;
-  color: var(--ink);
-  font-weight: 900;
-
-  cursor: pointer;
-  user-select: none;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease, transform 120ms ease;
+/* Buttons inside: no own radius (so middle stays flat) */
+.langSeg .langSegBtn{
+  border:0;
+  background:transparent;
+  padding:8px 12px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-weight:900;
+  color:var(--ink);
+  cursor:pointer;
+  user-select:none;
 }
 
-.langSwitch .langBtn:hover {
-  transform: translateY(-1px);
+/* Middle separator (single line) */
+.langSeg .langSegBtn + .langSegBtn{
+  border-left:1px solid var(--border);
 }
 
-/* highlight = active language (matches the “active” behavior from Vue) */
-.langSwitch .langBtn.active {
-  background: var(--ink);
-  color: #fff;
-  border-color: var(--ink);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+/* Ensure text never disappears due to inherited/overridden styles */
+.langSeg .langSegBtn .label{ color:inherit !important; }
+.langSeg .langSegBtn .flag{ display:block; }
+
+/* Active highlight */
+.langSeg .langSegBtn.active{
+  background:var(--ink);
+  color:#fff !important;
 }
 
-.langSwitch .langBtn:focus-visible {
-  outline: 2px solid var(--ok);
-  outline-offset: 2px;
+/* Keyboard focus */
+.langSeg .langSegBtn:focus-visible{
+  outline:2px solid var(--ok);
+  outline-offset:-2px;
 }
