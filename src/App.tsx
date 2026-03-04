@@ -13,40 +13,44 @@ import { useI18n } from "./i18n";
 function LangButtons() {
   const { lang, setLang, t } = useI18n();
   return (
-   // TSX (React) — merged segmented switch + center flags + active highlight (no disappearing text)
-<div className="langSeg" role="group" aria-label={t("nav.lang")}>
+   // TSX — EXACT same structure + behavior as the Vue "langSwitch" (flags meet in the middle)
+<div
+  className="langSwitch"
+  aria-label="Language"
+  style={{ display: "flex", alignItems: "center", gap: 10 }}
+>
   <button
     type="button"
-    className={`langSegBtn left ${lang === "tr" ? "active" : ""}`}
-    aria-pressed={lang === "tr"}
+    className={lang === "tr" ? "active" : ""}
     onClick={() => setLang("tr")}
+    style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
   >
-    <span className="label">{t("lang.tr")}</span>
+    <span>{t("lang.tr")}</span>
     <img
-      className="flag"
       src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f1f9-1f1f7.svg"
       alt="TR"
       width={18}
       height={18}
+      style={{ display: "block" }}
       draggable={false}
     />
   </button>
 
   <button
     type="button"
-    className={`langSegBtn right ${lang === "en" ? "active" : ""}`}
-    aria-pressed={lang === "en"}
+    className={lang === "en" ? "active" : ""}
     onClick={() => setLang("en")}
+    style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
   >
     <img
-      className="flag"
       src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f1ec-1f1e7.svg"
       alt="EN"
       width={18}
       height={18}
+      style={{ display: "block" }}
       draggable={false}
     />
-    <span className="label">{t("lang.en")}</span>
+    <span>{t("lang.en")}</span>
   </button>
 </div>
   );

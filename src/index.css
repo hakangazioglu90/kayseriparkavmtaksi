@@ -35,47 +35,22 @@ img {
   max-width: 100%;
   display: block;
 }
-/* Segmented container: curved ends only, merged middle */
-.langSeg{
-  display:inline-flex;
-  align-items:stretch;
-  border:1px solid var(--border);
-  border-radius:999px;
+/* CSS — copy EXACTLY (and do NOT add .btn on these buttons) */
+.langSwitch{
+  display:flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   overflow:hidden;
-  background:#fff;
 }
-
-/* Buttons inside: no own radius (so middle stays flat) */
-.langSeg .langSegBtn{
-  border:0;
-  background:transparent;
-  padding:8px 12px;
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  font-weight:900;
-  color:var(--ink);
+.langSwitch button{
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
   cursor:pointer;
-  user-select:none;
+  font-weight: 950;
+  color: rgba(0,0,0,.75);
 }
-
-/* Middle separator (single line) */
-.langSeg .langSegBtn + .langSegBtn{
-  border-left:1px solid var(--border);
-}
-
-/* Ensure text never disappears due to inherited/overridden styles */
-.langSeg .langSegBtn .label{ color:inherit !important; }
-.langSeg .langSegBtn .flag{ display:block; }
-
-/* Active highlight */
-.langSeg .langSegBtn.active{
-  background:var(--ink);
-  color:#fff !important;
-}
-
-/* Keyboard focus */
-.langSeg .langSegBtn:focus-visible{
-  outline:2px solid var(--ok);
-  outline-offset:-2px;
+.langSwitch button.active{
+  background: rgba(244,194,26,.22);
+  color: var(--brandInk);
 }
