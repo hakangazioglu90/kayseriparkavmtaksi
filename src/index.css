@@ -35,3 +35,47 @@ img {
   max-width: 100%;
   display: block;
 }
+/* Add to your global CSS (or component CSS module) */
+
+/* same container behavior as the Vue sample */
+.langSwitch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* base button style similar to the site’s pill buttons */
+.langSwitch .langBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 10px;
+
+  background: #fff;
+  color: var(--ink);
+  font-weight: 900;
+
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.langSwitch .langBtn:hover {
+  transform: translateY(-1px);
+}
+
+/* highlight = active language (matches the “active” behavior from Vue) */
+.langSwitch .langBtn.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+
+.langSwitch .langBtn:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}

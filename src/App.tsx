@@ -13,20 +13,12 @@ import { useI18n } from "./i18n";
 function LangButtons() {
   const { lang, setLang, t } = useI18n();
   return (
-   <div
-  className="row"
-  style={{ gap: 8, alignItems: "center" }}
-  aria-label={t("nav.lang")}
->
+   // TSX (React) — language switch with same layout + active highlight style hook
+<div className="langSwitch" aria-label={t("nav.lang")}>
   <button
-    className="btn"
+    type="button"
+    className={`langBtn ${lang === "tr" ? "active" : ""}`}
     onClick={() => setLang("tr")}
-    style={{
-      fontWeight: lang === "tr" ? 900 : 700,
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-    }}
   >
     <span>{t("lang.tr")}</span>
     <img
@@ -39,14 +31,9 @@ function LangButtons() {
   </button>
 
   <button
-    className="btn"
+    type="button"
+    className={`langBtn ${lang === "en" ? "active" : ""}`}
     onClick={() => setLang("en")}
-    style={{
-      fontWeight: lang === "en" ? 900 : 700,
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-    }}
   >
     <img
       src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f1ec-1f1e7.svg"
