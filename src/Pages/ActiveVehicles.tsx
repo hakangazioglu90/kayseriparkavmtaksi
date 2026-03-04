@@ -1,10 +1,10 @@
-// src/Pages/ActiveVehicles.tsx  (FULL) — language switch + list click focuses map + keeps original “online in last 2 min” logic
+// src/Pages/ActiveVehicles.tsx  (FULL) — no useMap hook (fixes “J is not a function”), lang switch, click-to-focus
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
 import { onValue, ref as dbRef } from "firebase/database";
 import { rtdb } from "../firebase";
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 import { useI18n } from "../i18n";
 
 type Live = {
@@ -35,12 +35,6 @@ function toNum(x: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function MapRefBinder({ onMap }: { onMap: (m: LeafletMap) => void }) {
-  const map = useMap();
-  useEffect(() => onMap(map), [map, onMap]);
-  return null;
-}
-
 export default function ActiveVehicles() {
   const { lang, setLang, t } = useI18n();
   const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
@@ -51,7 +45,7 @@ export default function ActiveVehicles() {
 
   const mapRef = useRef<LeafletMap | null>(null);
 
-  // keep existing behavior: show vehicles that sent GPS within last 2 minutes
+  // Keep same “online window” intent
   const WINDOW_MS = 2 * 60 * 1000;
 
   useEffect(() => {
@@ -67,7 +61,6 @@ export default function ActiveVehicles() {
     return () => unsub();
   }, []);
 
-  // Parse all records (no time filter yet)
   const all = useMemo<Entry[]>(() => {
     const f = filter.trim().toUpperCase();
 
@@ -91,24 +84,25 @@ export default function ActiveVehicles() {
       .sort((a, b) => (a.id > b.id ? 1 : -1));
   }, [live, filter]);
 
-  // Apply “online window” filter (this is the only thing that can make list empty if GPS isn’t sending frequently)
   const entries = useMemo(() => {
     const now = Date.now();
     return all.filter((x) => now - x.ts < WINDOW_MS);
   }, [all]);
 
-  const center: [number, number] = entries.length
-    ? [entries[0].lat, entries[0].lng]
-    : [38.7312, 35.4787];
+  const center: [number, number] = entries.length ? [entries[0].lat, entries[0].lng] : [38.7312, 35.4787];
 
-  function focusOn(v: Entry) {
+  const bindMap = useCallback((m: LeafletMap | null) => {
+    if (m) mapRef.current = m;
+  }, []);
+
+  const focusOn = useCallback((v: Entry) => {
     setSel(v.id);
     try {
       mapRef.current?.setView([v.lat, v.lng], 16, { animate: true });
     } catch {
       // ignore
     }
-  }
+  }, []);
 
   return (
     <div className="container">
@@ -118,16 +112,13 @@ export default function ActiveVehicles() {
             <div className="grid" style={{ gap: 4 }}>
               <div style={{ fontWeight: 950, fontSize: 18 }}>{trEn("Aktif araçlar", "Active vehicles")}</div>
               <div className="small">
-                {trEn(
-                  "Son 2 dakika içinde GPS gönderen araçları gösterir.",
-                  "Shows vehicles that sent GPS within last 2 minutes."
-                )}
+                {trEn("Son 2 dakika içinde GPS gönderen araçları gösterir.", "Shows vehicles that sent GPS within last 2 minutes.")}
               </div>
             </div>
 
             <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              {/* language selection (simple + uses existing keys only) */}
-              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+              {/* Language selection */}
+              <div className="row" style={{ gap: 8, alignItems: "center" }} aria-label={t("nav.lang")}>
                 <button className="btn" onClick={() => setLang("tr")} style={{ fontWeight: lang === "tr" ? 900 : 700 }}>
                   {t("lang.tr")}
                 </button>
@@ -144,7 +135,7 @@ export default function ActiveVehicles() {
                 onChange={(e) => setFilter(e.target.value)}
               />
 
-              {/* shows both: online count + total parsed count, so you can see if “2 minutes” is the reason */}
+              {/* show both counts so you can see if window filter is the reason */}
               <span className="badge">
                 {entries.length} {trEn("online", "online")} • {all.length} {trEn("toplam", "total")}
               </span>
@@ -155,9 +146,13 @@ export default function ActiveVehicles() {
         <div className="grid" style={{ gridTemplateColumns: "1.6fr .8fr", gap: 12 }}>
           <div className="card">
             <div className="cardPad">
-              <MapContainer center={center} zoom={12} style={{ height: 520, borderRadius: 12 }}>
+              <MapContainer
+                center={center}
+                zoom={12}
+                style={{ height: 520, borderRadius: 12 }}
+                ref={bindMap as any} // avoids useMap hook; fixes “J is not a function” on some react-leaflet builds
+              >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <MapRefBinder onMap={(m) => (mapRef.current = m)} />
 
                 {entries.map((v) => {
                   const selected = sel === v.id;
@@ -194,12 +189,6 @@ export default function ActiveVehicles() {
               {entries.length === 0 && (
                 <div className="p">
                   {trEn("Online araç yok.", "No vehicles online.")}
-                  <div className="small" style={{ marginTop: 6 }}>
-                    {trEn(
-                      "Not: 'online' için son 2 dakika şartı var. 'toplam' > 0 ise GPS güncellemesi eski kalmış olabilir.",
-                      "Note: 'online' requires updates in last 2 minutes. If 'total' > 0, GPS updates may be stale."
-                    )}
-                  </div>
                 </div>
               )}
 
@@ -218,6 +207,8 @@ export default function ActiveVehicles() {
                       borderRadius: 12,
                       padding: 10,
                       background: selected ? "rgba(0,0,0,.06)" : "#fff",
+                      outline: selected ? "2px solid var(--brand)" : "none",
+                      outlineOffset: 2,
                     }}
                     title={trEn("Haritada göster", "Focus on map")}
                   >
