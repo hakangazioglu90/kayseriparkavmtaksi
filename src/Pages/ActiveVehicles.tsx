@@ -1,19 +1,13 @@
-// src/Pages/ActiveVehicles.tsx  (FULL) — no useMap hook (fixes “J is not a function”), lang switch, click-to-focus
+// src/Pages/ActiveVehicles.tsx  (FULL)
 import "leaflet/dist/leaflet.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
 import { onValue, ref as dbRef } from "firebase/database";
 import { rtdb } from "../firebase";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 import { useI18n } from "../i18n";
 
-type Live = {
-  lat?: number | string;
-  lng?: number | string;
-  ts?: number | string;
-  status?: string;
-  acc?: number | string;
-};
+type Live = { lat?: number | string; lng?: number | string; ts?: number | string; status?: string; acc?: number | string };
 
 type Entry = {
   id: string;
@@ -22,6 +16,8 @@ type Entry = {
   ts: number;
   status?: string;
   acc?: number;
+  ageMs: number;
+  online: boolean;
 };
 
 function pillClass(status?: string) {
@@ -42,10 +38,10 @@ export default function ActiveVehicles() {
   const [live, setLive] = useState<Record<string, Live>>({});
   const [filter, setFilter] = useState("");
   const [sel, setSel] = useState<string>("");
+  const [showStale, setShowStale] = useState(true);
 
   const mapRef = useRef<LeafletMap | null>(null);
 
-  // Keep same “online window” intent
   const WINDOW_MS = 2 * 60 * 1000;
 
   useEffect(() => {
@@ -62,6 +58,7 @@ export default function ActiveVehicles() {
   }, []);
 
   const all = useMemo<Entry[]>(() => {
+    const now = Date.now();
     const f = filter.trim().toUpperCase();
 
     return Object.entries(live)
@@ -70,54 +67,66 @@ export default function ActiveVehicles() {
         const lng = toNum(v?.lng);
         const ts = toNum(v?.ts);
         const acc = toNum((v as any)?.acc);
+
+        if (lat == null || lng == null || ts == null) return null;
+
+        const ageMs = Math.max(0, now - ts);
+        const online = ageMs < WINDOW_MS;
+
         return {
           id: id.toUpperCase(),
-          lat: lat ?? NaN,
-          lng: lng ?? NaN,
-          ts: ts ?? NaN,
+          lat,
+          lng,
+          ts,
           acc: acc ?? undefined,
           status: v?.status,
-        };
+          ageMs,
+          online,
+        } as Entry;
       })
-      .filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Number.isFinite(x.ts))
-      .filter((x) => !f || x.id.includes(f))
-      .sort((a, b) => (a.id > b.id ? 1 : -1));
+      .filter(Boolean)
+      .filter((x) => !f || (x as Entry).id.includes(f))
+      .sort((a, b) => (a!.id > b!.id ? 1 : -1)) as Entry[];
   }, [live, filter]);
 
-  const entries = useMemo(() => {
-    const now = Date.now();
-    return all.filter((x) => now - x.ts < WINDOW_MS);
-  }, [all]);
+  const onlineEntries = useMemo(() => all.filter((x) => x.online), [all]);
+  const staleEntries = useMemo(() => all.filter((x) => !x.online), [all]);
 
-  const center: [number, number] = entries.length ? [entries[0].lat, entries[0].lng] : [38.7312, 35.4787];
+  const visible = showStale ? all : onlineEntries;
 
-  const bindMap = useCallback((m: LeafletMap | null) => {
-    if (m) mapRef.current = m;
-  }, []);
+  const center: [number, number] = visible.length ? [visible[0].lat, visible[0].lng] : [38.7312, 35.4787];
 
-  const focusOn = useCallback((v: Entry) => {
+  function focusOn(v: Entry) {
     setSel(v.id);
     try {
       mapRef.current?.setView([v.lat, v.lng], 16, { animate: true });
     } catch {
       // ignore
     }
-  }, []);
+  }
+
+  function fmtAge(ms: number) {
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    return `${h}h`;
+  }
 
   return (
     <div className="container">
       <div className="grid" style={{ gap: 12 }}>
         <div className="card">
-          <div className="cardPad row" style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div className="cardPad row" style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
             <div className="grid" style={{ gap: 4 }}>
               <div style={{ fontWeight: 950, fontSize: 18 }}>{trEn("Aktif araçlar", "Active vehicles")}</div>
               <div className="small">
-                {trEn("Son 2 dakika içinde GPS gönderen araçları gösterir.", "Shows vehicles that sent GPS within last 2 minutes.")}
+                {trEn("Online = son 2 dakika konum güncel.", "Online = location updated within last 2 minutes.")}
               </div>
             </div>
 
             <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              {/* Language selection */}
               <div className="row" style={{ gap: 8, alignItems: "center" }} aria-label={t("nav.lang")}>
                 <button className="btn" onClick={() => setLang("tr")} style={{ fontWeight: lang === "tr" ? 900 : 700 }}>
                   {t("lang.tr")}
@@ -127,6 +136,11 @@ export default function ActiveVehicles() {
                 </button>
               </div>
 
+              <label className="row" style={{ gap: 8, alignItems: "center" }}>
+                <input type="checkbox" checked={showStale} onChange={(e) => setShowStale(e.target.checked)} />
+                <span className="small">{trEn("Eski konumları da göster", "Show stale too")}</span>
+              </label>
+
               <input
                 className="input"
                 style={{ width: 220 }}
@@ -135,9 +149,8 @@ export default function ActiveVehicles() {
                 onChange={(e) => setFilter(e.target.value)}
               />
 
-              {/* show both counts so you can see if window filter is the reason */}
               <span className="badge">
-                {entries.length} {trEn("online", "online")} • {all.length} {trEn("toplam", "total")}
+                {onlineEntries.length} {trEn("online", "online")} • {all.length} {trEn("toplam", "total")}
               </span>
             </div>
           </div>
@@ -150,18 +163,22 @@ export default function ActiveVehicles() {
                 center={center}
                 zoom={12}
                 style={{ height: 520, borderRadius: 12 }}
-                ref={bindMap as any} // avoids useMap hook; fixes “J is not a function” on some react-leaflet builds
+                ref={mapRef as any}
               >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-                {entries.map((v) => {
+                {visible.map((v) => {
                   const selected = sel === v.id;
                   return (
                     <CircleMarker
                       key={v.id}
                       center={[v.lat, v.lng]}
                       radius={selected ? 10 : 8}
-                      pathOptions={{ weight: selected ? 3 : 2 }}
+                      pathOptions={{
+                        weight: selected ? 3 : 2,
+                        opacity: v.online ? 1 : 0.4,
+                        fillOpacity: v.online ? 0.6 : 0.15,
+                      }}
                       eventHandlers={{ click: () => focusOn(v) }}
                     >
                       <Popup>
@@ -175,6 +192,8 @@ export default function ActiveVehicles() {
                               • <span className="mono">{Math.round(v.acc)}m</span>
                             </>
                           ) : null}
+                          {" "}
+                          • <span className="mono">{fmtAge(v.ageMs)}</span>
                         </div>
                       </Popup>
                     </CircleMarker>
@@ -186,13 +205,9 @@ export default function ActiveVehicles() {
 
           <div className="card">
             <div className="cardPad grid" style={{ gap: 10, maxHeight: 560, overflow: "auto" }}>
-              {entries.length === 0 && (
-                <div className="p">
-                  {trEn("Online araç yok.", "No vehicles online.")}
-                </div>
-              )}
+              {visible.length === 0 && <div className="p">{trEn("Kayıt yok.", "No records.")}</div>}
 
-              {entries.map((v) => {
+              {(showStale ? visible : onlineEntries).map((v) => {
                 const selected = sel === v.id;
                 return (
                   <button
@@ -207,8 +222,7 @@ export default function ActiveVehicles() {
                       borderRadius: 12,
                       padding: 10,
                       background: selected ? "rgba(0,0,0,.06)" : "#fff",
-                      outline: selected ? "2px solid var(--brand)" : "none",
-                      outlineOffset: 2,
+                      opacity: v.online ? 1 : 0.7,
                     }}
                     title={trEn("Haritada göster", "Focus on map")}
                   >
@@ -224,6 +238,9 @@ export default function ActiveVehicles() {
                           • <span className="mono">{Math.round(v.acc)}m</span>
                         </>
                       ) : null}
+                      {" "}
+                      • <span className="mono">{fmtAge(v.ageMs)}</span>
+                      {!v.online ? <span className="small"> • {trEn("eski", "stale")}</span> : null}
                     </div>
                   </button>
                 );
@@ -231,6 +248,15 @@ export default function ActiveVehicles() {
             </div>
           </div>
         </div>
+
+        {showStale && staleEntries.length > 0 ? (
+          <div className="small" style={{ opacity: 0.8 }}>
+            {trEn(
+              "Not: 'eski' demek GPS açık değil veya konum güncellenmiyor (ts eski).",
+              "Note: 'stale' means GPS is off or not updating (ts is old)."
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );
