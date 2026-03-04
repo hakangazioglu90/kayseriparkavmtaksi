@@ -32,7 +32,7 @@ function toNum(x: unknown): number | null {
 }
 
 export default function ActiveVehicles() {
-  const { lang, setLang, t } = useI18n();
+  const { lang} = useI18n();
   const trEn = (tr: string, en: string) => (lang === "tr" ? tr : en);
 
   const [live, setLive] = useState<Record<string, Live>>({});
@@ -127,15 +127,7 @@ export default function ActiveVehicles() {
             </div>
 
             <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <div className="row" style={{ gap: 8, alignItems: "center" }} aria-label={t("nav.lang")}>
-                <button className="btn" onClick={() => setLang("tr")} style={{ fontWeight: lang === "tr" ? 900 : 700 }}>
-                  {t("lang.tr")}
-                </button>
-                <button className="btn" onClick={() => setLang("en")} style={{ fontWeight: lang === "en" ? 900 : 700 }}>
-                  {t("lang.en")}
-                </button>
-              </div>
-
+            
               <label className="row" style={{ gap: 8, alignItems: "center" }}>
                 <input type="checkbox" checked={showStale} onChange={(e) => setShowStale(e.target.checked)} />
                 <span className="small">{trEn("Eski konumları da göster", "Show stale too")}</span>
